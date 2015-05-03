@@ -14,8 +14,18 @@ import tornado.httpclient
 define('debug', default=True, type=bool)
 define('port', default=8888, type=int)
 define('host', default='127.0.0.1', type=str)
+define('ga', default=None, type=str)
 
-class IndexHandler(tornado.web.RequestHandler):
+
+class BaseHandler(tornado.web.RequestHandler):
+
+    def render(self, *args, **kwargs):
+        kwargs['ga'] = options.ga
+
+        super(BaseHandler, self).render(*args, **kwargs)
+
+
+class IndexHandler(BaseHandler):
 
     def get(self):
         self.render('index.html')
@@ -24,12 +34,12 @@ class IndexHandler(tornado.web.RequestHandler):
         print self.request.arguments
         self.write('hi')
 
-class MyFileHandler(tornado.web.RequestHandler):
+class MyFileHandler(BaseHandler):
 
     def get(self):
         self.render('myfile.html')
 
-class ManageHandler(tornado.web.RequestHandler):
+class ManageHandler(BaseHandler):
 
     def write(self, chunk):
         if isinstance(chunk, dict):
