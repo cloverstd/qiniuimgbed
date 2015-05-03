@@ -1,0 +1,214 @@
+{% extends 'layout.html' %}
+
+
+{% block style %}
+<style>
+    .upload-box {
+        border: 2px dashed rgb(114, 188, 240);
+        height: 200px;
+        cursor: pointer;
+    }
+    .upload-box p {
+        padding-top: 88px;
+        display: block;
+        width: 50%;
+        margin: 0 auto;
+        line-height: 20px;
+    }
+    .progress-box {
+        margin-top: 20px;
+        padding: 5px;
+    }
+    .progress {
+        margin-bottom: 0px;
+    }
+    .img-box {
+        height: 250px;
+    }
+    .img-box a {
+        display: block;
+        height: 210px;
+    }
+    .img-box img {
+        width: 100%;
+        max-height: 210px;
+    }
+    .img-box input {
+        margin-top: 8px;
+        height: 23px;
+    }
+    .file-box .file {
+        font-size: 100px;
+    }
+    .file-box a {
+        color: rgb(176, 199, 229);
+        padding-top: 50px;
+    }
+</style>
+{% end %}
+
+{% block main %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="row resutl-box">
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="upload-box">
+                    <p>
+                        点击、或者拖拽文件到此
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="row progress-box">
+            <div class="col-md-12">
+            </div>
+        </div>
+    </div>
+</div>
+{% end %}
+
+{% block script %}
+<script>
+    function getToken() {
+        if (! settings) {
+            alert('请先设置');
+            return;
+        }
+        if (! settings.ak) {
+            alert('请先设置 AK');
+            return;
+        }
+        if (! settings.sk) {
+            alert('请先设置 SK');
+            return;
+        }
+        if (! settings.bucket) {
+            alert('请先设置 bucket');
+            return;
+        }
+
+        var expires = 3600;
+        var policy = new Object();
+        var bucketName = settings.bucket;
+        var accessKey = settings.ak;
+        var secretKey = settings.sk;
+        policy.scope = bucketName;
+        var name = Math.floor((Math.random() * 1000));
+        policy.saveKey = '$(year)/$(mon)/$(day)/$(etag)' + name + '$(ext)';
+        var returnBody = {
+            key: '$(key)',
+            origin_name: '$(fname)',
+            hash: '$(etag)',
+            width: '$(imageInfo.width)',
+            height: '$(imageInfo.height)',
+            type: '$(mimeType)'
+        };
+        policy.returnBody = JSON.stringify(returnBody);
+        var deadline = Math.round(new Date().getTime() / 1000) + expires;
+        policy.deadline = deadline;
+        console.log(policy);
+        var uptoken = genToken(accessKey, secretKey, policy);
+        return uptoken;
+    }
+    function createProgress(file) {
+        var $progressWrapper = $('<div></div>');
+        $progressWrapper.addClass('progress-wrapper');
+
+        var $progress = $('<div></div>');
+        $progress.addClass('progress');
+        var $progressBar = $('<div></div>');
+        $progressBar.addClass('progress-bar');
+        $progressBar.addClass('progress-bar-success');
+        $progressBar.css('width', '0%');
+        $progressBar.appendTo($progress);
+
+        var $progressText = $('<div></div>');
+        $progressText.addClass('progress-text');
+        $progressText.addClass('text-center');
+        $progressText.text(file.name);
+
+        $progressWrapper.append($progress);
+        $progressWrapper.append($progressText);
+        return $progressWrapper;
+    }
+    function createResultImage(img) {
+        var url = settings.domain + img.key;
+        var $img;
+        if (img.type.startsWith('image')) {
+            $img = $('<div class="col-md-4" style="display:none;"> \
+                    <div class="thumbnail img-box">\
+                        <a href="'+url+'" target="_blank">\
+                            <img src="'+url+'">\
+                        </a>\
+                        <input type="text" class="form-control input-sm" value="'+url+'">\
+                    </div>\
+                </div>');
+        } else {
+            $img = $('<div class="col-md-4" style="display:none;"> \
+                    <div class="thumbnail img-box file-box">\
+                        <a href="'+url+'" target="" class="text-center">\
+                            <span class="glyphicon glyphicon-file file" aria-hidden="true"></span>\
+                        </a>\
+                        <input type="text" class="form-control input-sm" value="'+url+'">\
+                    </div>\
+                </div>');
+        }
+        return $img;
+    }
+    $(function() {
+        $(".upload-box").dropzone({
+            url: "http://upload.qiniu.com",
+            clickable: true,
+            maxFilesize: 10,
+            maxFiles: 5,
+            params: {
+            },
+            success: function(file, data) {
+                var $img = createResultImage(data);
+                $('.resutl-box').prepend($img);
+                $img.slideDown(function() {
+                    file.progress.fadeIn('slow', function() {
+                        $(this).remove();
+                    });
+                });
+                console.log(data);
+            },
+            maxfilesexceeded: function(file) {
+                file.progress.remove();
+            },
+            addedfile: function(file) {
+                this.options.params.token = getToken();
+                var $progress = createProgress(file);
+                $('.progress-box .col-md-12').append($progress);
+                file.progress = $progress;
+                $('.upload-box p').css('padding-top', 44);
+                /* $('.upload-box').css('height', 100); */
+                $('.upload-box').animate({
+                    height: "100px"
+                }, 500);
+            },
+            uploadprogress: function(file, progress, bytesSent) {
+                file.progress.find('.progress-bar').css('width', progress + '%');
+                file.progress.find('.progress-bar').text(progress.toFixed(2) + '%');
+            },
+            queuecomplete: function() {
+                $('.upload-box p').css('padding-top', 88);
+                $('.upload-box').animate({
+                    height: "200px"
+                }, 500);
+            }
+        });
+
+        $('.resutl-box').on('mouseenter', 'input', function() {
+            $(this).select();
+        });
+        $('.result-box').on('mouseleave', 'input', function() {
+            $(this).blur();
+        });
+    });
+</script>
+{% end %}

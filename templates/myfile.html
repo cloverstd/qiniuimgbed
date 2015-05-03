@@ -1,0 +1,167 @@
+{% extends 'layout.html' %}
+
+{% block style %}
+<style>
+    .img-box {
+        height: 250px;
+        position: relative;
+    }
+    .img-box a {
+        display: block;
+        height: 210px;
+    }
+    .img-box img {
+        width: 100%;
+        max-height: 210px;
+    }
+    .img-box input {
+        margin-top: 8px;
+        height: 23px;
+    }
+    .img-del {
+        position: absolute;
+        right: 9px;
+        top: 9px;
+        display: none;
+    }
+    .file-box .file {
+        font-size: 100px;
+    }
+    .file-box a {
+        color: rgb(176, 199, 229);
+        padding-top: 50px;
+    }
+</style>
+{% end %}
+
+{% block main %}
+<div class="row" style="margin-bottom:20px;">
+    <div class="col-md-3">
+    <div class="input-group">
+        <input type="text" class="form-control img-filter" placeholder="过滤器:2015/05/03">
+        <span class="input-group-btn">
+            <button class="btn btn-default img-filter" type="button">
+                <span class="glyphicon glyphicon-search" aria-hidden="true"></span>
+            </button>
+        </span>
+        </div>
+    </div>
+</div>
+<div class="row img-list">
+</div>
+{% end %}
+
+{% block script %}
+<script>
+    function createImgBox(img) {
+        if (! settings) {
+            alert('请先设置');
+            return;
+        }
+        if (! settings.ak) {
+            alert('请先设置 AK');
+            return;
+        }
+        if (! settings.sk) {
+            alert('请先设置 SK');
+            return;
+        }
+        if (! settings.bucket) {
+            alert('请先设置 bucket');
+            return;
+        }
+        var url = settings.domain + img.key;
+        var $imgBox = $('<div class="col-md-3">\
+                <div class="thumbnail img-box">\
+                    <button data-key="' + img.key + '" class="btn btn-danger img-del btn-xs"><span class="glyphicon glyphicon-trash" aria-hidden="true"></span></button>\
+                    <a href="' + url + '" target="_blank">\
+                        <img src="' + url + '" data-src="' + url + '">\
+                    </a>\
+                    <input type="text" class="form-control input-sm" value="' + url + '">\
+                </div>\
+            </div>');
+        return $imgBox;
+    }
+    function createUnknowBox(file) {
+        var url = settings.domain + file.key;
+        var $fileBox = $('<div class="col-md-3">\
+                <div class="thumbnail img-box file-box">\
+                    <button data-key="' + file.key + '" class="btn btn-danger img-del btn-xs"><span class="glyphicon glyphicon-trash" aria-hidden="true"></span></button>\
+                    <a href="' + url + '" target="" class="text-center">\
+                        <span class="glyphicon glyphicon-file file" aria-hidden="true"></span>\
+                    </a>\
+                    <input type="text" class="form-control input-sm" value="' + url + '">\
+                </div>\
+            </div>');
+        return $fileBox;
+    }
+    function listFile(filter) {
+        var params = {};
+        params.limit = 1000;
+        params.bucket = settings.bucket;
+        if (filter) {
+            params.prefix = filter;
+        }
+        $('.img-list').html('');
+
+        $.post('/myfile/list', getListToken(settings.ak, settings.sk, params))
+            .success(function(data) {
+                console.log(data);
+                if (data.meta.code == 0) {
+                    $.each(data.data.items, function(index, item) {
+                        if (item.key && item.mimeType.startsWith('image')) {
+                            var $img = createImgBox(item);
+                            $('.img-list').append($img);
+                        } else {
+                            var $file = createUnknowBox(item);
+                            $('.img-list').append($file);
+                        }
+                        $("img").trigger("unveil");
+                    });
+                }
+            });
+    }
+    function deleteFile(key, cb) {
+        $.post('/myfile/delete', getDeleteToken(settings.ak, settings.sk, settings.bucket, key))
+            .success(function(data) {
+                if (cb) {
+                    cb(data);
+                }
+            });
+    }
+    $(function() {
+        listFile();
+
+        $('button.img-filter').click(function() {
+            var key = $('input.img-filter').val()
+            console.log(key);
+            listFile(key);
+        });
+
+        $('.img-list').on('click', '.img-del', function() {
+            console.log('del');
+            var key = $(this).data('key');
+            var _this = $(this);
+            deleteFile(key, function(data) {
+                if (data.meta.code == 0) {
+                    _this.parent().parent().fadeOut(function() {
+                        $(this).remove();
+                    });
+                } else {
+                    console.error(data.meta.msg);
+                    alert('删除失败');
+                }
+            });
+        });
+        $('.img-list').on('mouseenter mouseleave', '.img-box', function() {
+            $(this).find('.img-del').toggle();
+        });
+        $('.img-list').on('mouseenter', 'input', function() {
+            $(this).select();
+        });
+        $('.img-list').on('mouseleave', 'input', function() {
+            $(this).blur();
+        });
+    });
+</script>
+{% end %}
